@@ -35,13 +35,13 @@
           v-bind:value="bartWeight"
           v-on:input="onSliderChange($event, 'bart')"/>
 
-        <h3>Travel Time Weight: {{travelTimeWeight}}</h3>
+        <h3>Travel Time Weight: {{travelWeight}}</h3>
         <input        
           type="range"
           min="0"
           max="1"
           step=any
-          v-bind:value="travelTimeWeight"
+          v-bind:value="travelWeight"
           v-on:input="onSliderChange($event, 'travelTime')"/>
 
         <h3>Points of Interest Weight: {{pointsOfInterestWeight}}</h3>
@@ -56,7 +56,7 @@
         <h3>Resolution: {{h3Resolution}}</h3>
         <input        
           type="range"
-          min="7"
+          min="5"
           v-bind:max="maxH3Resolution"
           v-bind:value="h3Resolution"
           v-on:input="onSliderChange($event, 'resolution')"/>
@@ -120,7 +120,7 @@ export default {
       pointsOfInterestWeight: 1,
       travelTimeLayer: null,
       travelTimes: null,
-      travelTimeWeight: 1,
+      travelWeight: 1,
       bartLayer: null,
       bartStations: null,
       bartWeight: 1
@@ -158,6 +158,8 @@ export default {
         {hexagons: this.pointsOfInterestLayer, weight: this.pointsOfInterestWeight},
       ];
 
+      console.log(mapLayers);
+
       var hexagons = this.combineLayers(mapLayers);
       this.renderHexes(map, hexagons);
       //this.renderAreas(map, hexagons);
@@ -172,6 +174,8 @@ export default {
         {hexagons: this.pointsOfInterestLayer, weight: this.pointsOfInterestWeight},
       ];
 
+      console.log(mapLayers);
+
       var hexagons = this.combineLayers(mapLayers);
       this.renderHexes(this.map, hexagons);
       // this.renderAreas(this.map, hexagons);
@@ -179,20 +183,23 @@ export default {
     onSliderChange(event, type) {
       if (type == 'resolution') {
         this.h3Resolution = Number(event.target.value);
+        this.displayData(this.map);
       } else if (type == 'crime') {
         this.crimeWeight = Number(event.target.value);
+        this.redistributeWeights();
       } else if (type == 'schools') {
         this.schoolWeight = Number(event.target.value);
+        this.redistributeWeights();
       } else if (type == 'bart') {
         this.bartWeight = Number(event.target.value);
+        this.redistributeWeights();
       } else if (type == 'travelTime') {
-        this.travelTimeWeight = Number(event.target.value);
+        this.travelWeight = Number(event.target.value);
+        this.redistributeWeights();
       } else if (type == 'poi') {
         this.pointsOfInterestWeight = Number(event.target.value);  
+        this.redistributeWeights();
       }
-
-      console.log(this.crimeWeight);
-      this.redistributeWeights();
     },
     createLayers() {
       this.crimeLayer = this.createCrimeLayer();
