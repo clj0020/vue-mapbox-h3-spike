@@ -9,7 +9,11 @@
   },
   "dependencies": {
     "core-js": "^3.6.4",
-    "vue": "^2.6.11"
+    "geojson2h3": "^1.0.1",
+    "h3-js": "^3.6.3",
+    "mapbox-gl": "^1.7.0",
+    "vue": "^2.6.11",
+    "vue-mapbox": "^0.4.1"
   },
   "devDependencies": {
     "@vue/cli-plugin-babel": "~4.2.0",
