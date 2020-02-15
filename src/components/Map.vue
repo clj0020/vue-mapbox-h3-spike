@@ -124,27 +124,29 @@ export default {
     async onMapLoaded(event) {
       this.map = event.map;
 
-      await this.seedData().then(() => {
-        this.displayData(this.map);
-      });
+      var seeded = await this.seedData();
+      console.log(seeded);
+      this.displayData(this.map);
     },
-    async displayData(map) {
-      // await this.createLayers();
-      
+    displayData(map) {
+      console.log("Displaying data.");
       var mapLayers = [
-        {hexagons: this.schoolsLayer, weight: this.schoolWeight},
-        {hexagons: this.bartLayer, weight: this.bartWeight},
-        {hexagons: this.travelTimeLayer, weight: this.travelWeight},
+        {name: "schools", hexagons: this.schoolsLayer, weight: this.schoolWeight},
+        {name: "bart", hexagons: this.bartLayer, weight: this.bartWeight},
+        {name: "traveltime", hexagons: this.travelTimeLayer, weight: this.travelWeight},
         // Crime is bad, so we'll subtract it instead of adding
-        {hexagons: this.crimeLayer, weight: -(this.crimeWeight)},
-        {hexagons: this.pointsOfInterestLayer, weight: this.pointsOfInterestWeight},
+        {name: "crime", hexagons: this.crimeLayer, weight: -(this.crimeWeight)},
+        {name: "poi", hexagons: this.pointsOfInterestLayer, weight: this.pointsOfInterestWeight},
       ];
+
+      console.log(mapLayers);
 
       var hexagons = this.combineLayers(mapLayers);
       this.renderHexes(map, hexagons);
-      //this.renderAreas(map, hexagons);
     },
     redistributeWeights() {
+      console.log("Redistributing weights");
+
       var mapLayers = [
         {hexagons: this.schoolsLayer, weight: this.schoolWeight},
         {hexagons: this.bartLayer, weight: this.bartWeight},
@@ -156,11 +158,9 @@ export default {
 
       var hexagons = this.combineLayers(mapLayers);
       this.renderHexes(this.map, hexagons);
-      // this.renderAreas(this.map, hexagons);
     },
     combineLayers(mapLayers) {
       const combined = {};
-      console.log(mapLayers);
       mapLayers.forEach(({hexagons, weight}) => {
         Object.keys(hexagons).forEach(hex => {
           combined[hex] = (combined[hex] || 0) + hexagons[hex] * weight;
@@ -169,6 +169,7 @@ export default {
       return this.normalizeLayer(combined);  
     },
     createCrimeLayer(crime) {
+      console.log("Creating crime layer", crime);
       const layer = {};
       crime.forEach(({lat, lng}) => {
         const h3Index = this.$geoToH3(lat, lng, Number(this.h3Resolution));
@@ -177,6 +178,7 @@ export default {
       return this.normalizeLayer(layer);      
     },
     createSchoolsLayer(schools) {
+        console.log("Creating schools layer", schools);
         const layer = {};
         schools.forEach(({lat, lng}) => {
           const h3Index = this.$geoToH3(lat, lng, Number(this.h3Resolution));
@@ -190,9 +192,11 @@ export default {
       return this.normalizeLayer(layer);
     }, 
     createBartLayer(bartStations) {
+      console.log("Creating bart layer", bartStations);
       return this.normalizeLayer(this.bufferPointLinear(bartStations, this.kmToRadius(1)));
     },
     createTravelTimeLayer(travelTimes) {
+      console.log("Creating travel time layer", travelTimes);
       const layer = {};
       travelTimes.features.forEach(feature => {
         const hexagons = this.$geojson2h3.featureToH3Set(feature, Number(this.h3Resolution));
@@ -204,6 +208,7 @@ export default {
       return this.normalizeLayer(layer, true);
     },
     createPointsOfInterestLayer(pointsOfInterest) {
+        console.log("Creating poi layer", pointsOfInterest);
         const layer = {};
         pointsOfInterest.filter(poi => (poi.type === 'Cafes' || poi.type === 'Places to Eat' || poi.type === 'Restaurant')).forEach(({lat, lng}) => {
         const h3Index = this.$geoToH3(lat, lng, Number(this.h3Resolution));
@@ -212,48 +217,58 @@ export default {
         return this.normalizeLayer(layer);
     },
     async seedData() {
-      this.crime90days = await this.seedCrimeData();
-      this.publicSchools = await this.seedPublicSchoolLocations();
-      this.bartStations = await this.seedMartaStations();
-      this.travelTimes = await this.seedTravelTimes();
-      this.pointsOfInterest = await this.seedPointsOfInterest();
+      console.log("Seeding data");
+      this.crimeLayer = await this.seedCrimeData();
+      console.log("Crime layer", this.crimeLayer);
+      this.schoolsLayer = await this.seedPublicSchoolLocations();
+      console.log("Schools layer", this.schoolsLayer);
+      this.bartLayer = await this.seedMartaStations();
+      console.log("Bart layer", this.bartLayer);
+      this.travelTimeLayer = await this.seedTravelTimes();
+      console.log("Travel Time layer", this.travelTimeLayer);
+      this.pointsOfInterestLayer = await this.seedPointsOfInterest();
+      console.log("POI layer", this.pointsOfInterestLayer);
+      return "Seeded";
     },
-    async seedTravelTimes() {
+    seedTravelTimes() {
       return json('https://gist.githubusercontent.com/nrabinowitz/d3a5ca3e3e40727595dd137b65058c76/raw/657a9f3b64fedc718c3882cd4adc645ac0b4cfc5/oakland_travel_times.json').then((travelTime) => {
-        this.createTravelTimeLayer(travelTime);
+        return this.createTravelTimeLayer(travelTime);
       });
     },
-    async seedMartaStations() {
+    seedMartaStations() {
       return text('./martaStops.txt').then((text) => {
         var martaStops =  stops(text);
-        this.createBartLayer(martaStops);
+        return this.createBartLayer(martaStops);
       });
     },
-    async seedCrimeData() {
-      return Papa.parse('https://query.data.world/s/3lnfl7oqpk3fspbleodbcu4wt4hwq5', {
-        download: true,
-        header: true,
-        complete: (results) => {
-          var crimes = results.data;
-          var value = Object.keys(crimes).map(function (id) {
-                return {
-                  "lat": crimes[id].lat,
-                  "lng": crimes[id].long,
-                  "type": crimes[id].crime
-                };
-            });
-          this.createCrimeLayer(value);
-        }
+    seedCrimeData() {
+      console.log("Seeding crime data");
+      return new Promise(resolve => {
+          Papa.parse('https://query.data.world/s/3lnfl7oqpk3fspbleodbcu4wt4hwq5', {
+            download: true,
+            header: true,
+            complete: results => {
+              var crimes = results.data;
+              var value = Object.keys(crimes).map(function (id) {
+                    return {
+                      "lat": crimes[id].lat,
+                      "lng": crimes[id].long,
+                      "type": crimes[id].crime
+                    };
+                });
+              resolve(this.createCrimeLayer(value));
+            }
+          });
       });
     },
-    async seedPublicSchoolLocations() {
+    seedPublicSchoolLocations() {
       return json('https://gist.githubusercontent.com/nrabinowitz/d3a5ca3e3e40727595dd137b65058c76/raw/babf7357f15c99a1b2a507a33d332a4a87b7df8d/public_schools.json').then((schools) => {
-        this.createSchoolsLayer(schools);
+        return this.createSchoolsLayer(schools);
       });
     },
-    async seedPointsOfInterest() {
+    seedPointsOfInterest() {
       return json('https://gist.githubusercontent.com/nrabinowitz/d3a5ca3e3e40727595dd137b65058c76/raw/ded89c2acef426fe3ee59b05096ed1baecf02090/oakland-poi.json').then((poi) => {
-        this.createPointsOfInterestLayer(poi);
+        return this.createPointsOfInterestLayer(poi);
       });
     },
     renderHexes(map, hexagons) {
