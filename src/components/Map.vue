@@ -1,79 +1,46 @@
 <template>
-<div>
-    <MglMap
-      id="map"
-      :accessToken="accessToken"
-      :mapStyle.sync="mapStyle"
-      :center="[config.lng, config.lat]"
-      @load="onMapLoaded">
-    </MglMap>
-    <div id="sliders">
-        <h3>Crime Weight: {{crimeWeight}}</h3>
-        <input        
-          type="range"
-          min="0"
-          max="1"
-          step=any
-          v-bind:value="crimeWeight"
-          v-on:input="onSliderChange($event, 'crime')"/>
-
-        <h3>School Weight: {{schoolWeight}}</h3>
-        <input        
-          type="range"
-          min="0"
-          max="1"
-          step=any
-          v-bind:value="schoolWeight"
-          v-on:input="onSliderChange($event, 'schools')"/>
-
-        <h3>Bart Weight: {{bartWeight}}</h3>
-        <input        
-          type="range"
-          min="0"
-          max="1"
-          step=any
-          v-bind:value="bartWeight"
-          v-on:input="onSliderChange($event, 'bart')"/>
-
-        <h3>Travel Time Weight: {{travelWeight}}</h3>
-        <input        
-          type="range"
-          min="0"
-          max="1"
-          step=any
-          v-bind:value="travelWeight"
-          v-on:input="onSliderChange($event, 'travelTime')"/>
-
-        <h3>Points of Interest Weight: {{pointsOfInterestWeight}}</h3>
-        <input        
-          type="range"
-          min="0"
-          max="1"
-          step=any
-          v-bind:value="pointsOfInterestWeight"
-          v-on:input="onSliderChange($event, 'poi')"/>
-
-        <h3>Resolution: {{h3Resolution}}</h3>
-        <input        
-          type="range"
-          min="5"
-          v-bind:max="maxH3Resolution"
-          v-bind:value="h3Resolution"
-          v-on:input="onSliderChange($event, 'resolution')"/>
-    </div>
-</div>
+<b-container fluid id="map-container">
+  <b-row id="map-row">
+    <b-col id="sliders">
+      <h3>Crime Weight: {{crimeWeight}}</h3>
+      <b-form-input id="range-1" v-model="crimeWeight" type="range" min="0" max="1" step="0.01"/>
+      
+      <h3>School Weight: {{schoolWeight}}</h3>
+      <b-form-input id="range-1" v-model="schoolWeight" type="range" min="0" max="1" step="0.01"/>
+      
+      <h3>Bart Weight: {{bartWeight}}</h3>
+      <b-form-input id="range-1" v-model="bartWeight" type="range" min="0" max="1" step="0.01"/>
+      
+      <h3>Travel Time Weight: {{travelWeight}}</h3>
+      <b-form-input id="range-1" v-model="travelWeight" type="range" min="0" max="1" step="0.01"/>
+      
+      <h3>Points of Interest Weight: {{pointsOfInterestWeight}}</h3>
+      <b-form-input id="range-1" v-model="pointsOfInterestWeight" type="range" min="0" max="1" step="0.01"/>
+      
+      <h3>Resolution: {{h3Resolution}}</h3>
+      <b-form-input id="range-1" v-model="h3Resolution" type="range" min="6" max="10"/>
+    </b-col>
+    <b-col cols="10" id="map-col">
+      <MglMap
+        :accessToken="accessToken"
+        :mapStyle.sync="mapStyle"
+        :center="[config.lng, config.lat]"
+        @load="onMapLoaded">
+      </MglMap>
+    </b-col>
+  </b-row>
+</b-container>
 </template>
 
 <style>
 
-  #sliders {
-    position: relative; 
-    background: #ffffff; 
-    display: inline-block;  
+  #map-container {
+    height: 100%;
+    min-height: 100vh;
   }
 
-  #map {
-    position: fixed;
+  #map-row {
+    height: 100%;
   }
 
   .selected {
@@ -95,6 +62,26 @@ export default {
   components: {
     MglMap
   },
+  watch: {
+    crimeWeight: function() {
+      this.redistributeWeights();
+    },
+    schoolWeight: function() {
+      this.redistributeWeights();
+    },
+    bartWeight: function() {
+      this.redistributeWeights();
+    },
+    travelWeight: function() {
+      this.redistributeWeights();
+    },
+    pointsOfInterestWeight: function() {
+      this.redistributeWeights();
+    },
+    h3Resolution: function() {
+      this.displayData(this.map);
+    }
+  },
   data() {
     return {
       accessToken: 'pk.eyJ1IjoiY2xqMDAyMCIsImEiOiJjam80b2Y4cmEwMWFrM3ZwNW9wbzZvNjF0In0.tGdbiR2A0B9bbHXo_Hg93w', // your access token. Needed if you using Mapbox maps
@@ -107,7 +94,6 @@ export default {
         colorScale: ['#ffffD9', '#50BAC3', '#1A468A'],
         areaThreshold: 0.75
       },
-      maxH3Resolution: 10,
       h3Resolution: 7,
       crimeLayer: null,
       crime90days: null,
@@ -180,27 +166,6 @@ export default {
       this.renderHexes(this.map, hexagons);
       // this.renderAreas(this.map, hexagons);
     },
-    onSliderChange(event, type) {
-      if (type == 'resolution') {
-        this.h3Resolution = Number(event.target.value);
-        this.displayData(this.map);
-      } else if (type == 'crime') {
-        this.crimeWeight = Number(event.target.value);
-        this.redistributeWeights();
-      } else if (type == 'schools') {
-        this.schoolWeight = Number(event.target.value);
-        this.redistributeWeights();
-      } else if (type == 'bart') {
-        this.bartWeight = Number(event.target.value);
-        this.redistributeWeights();
-      } else if (type == 'travelTime') {
-        this.travelWeight = Number(event.target.value);
-        this.redistributeWeights();
-      } else if (type == 'poi') {
-        this.pointsOfInterestWeight = Number(event.target.value);  
-        this.redistributeWeights();
-      }
-    },
     createLayers() {
       this.crimeLayer = this.createCrimeLayer();
       this.schoolsLayer = this.createSchoolsLayer();
@@ -220,7 +185,7 @@ export default {
     createCrimeLayer() {
       const layer = {};
       this.crime90days.forEach(({lat, lng}) => {
-        const h3Index = this.$geoToH3(lat, lng, this.h3Resolution);
+        const h3Index = this.$geoToH3(lat, lng, Number(this.h3Resolution));
         layer[h3Index] = (layer[h3Index] || 0) + 1;
       });
       return this.normalizeLayer(layer);      
@@ -228,7 +193,7 @@ export default {
     createSchoolsLayer() {
         const layer = {};
         this.publicSchools.forEach(({lat, lng}) => {
-          const h3Index = this.$geoToH3(lat, lng, this.h3Resolution);
+          const h3Index = this.$geoToH3(lat, lng, Number(this.h3Resolution));
           // Add school hex
           layer[h3Index] = (layer[h3Index] || 0) + 1;
           // add surrounding kRing, with less weight
@@ -244,7 +209,7 @@ export default {
     createTravelTimeLayer() {
       const layer = {};
       this.travelTimes.features.forEach(feature => {
-        const hexagons = this.$geojson2h3.featureToH3Set(feature, this.h3Resolution);
+        const hexagons = this.$geojson2h3.featureToH3Set(feature, Number(this.h3Resolution));
         hexagons.forEach(h3Index => {
           // Lower is better, so take the inverse
           layer[h3Index] = (layer[h3Index] || 0) + 1 / feature.properties.travelTime;
@@ -255,7 +220,7 @@ export default {
     createPointsOfInterestLayer() {
         const layer = {};
         this.pointsOfInterest.filter(poi => (poi.type === 'Cafes' || poi.type === 'Places to Eat' || poi.type === 'Restaurant')).forEach(({lat, lng}) => {
-        const h3Index = this.$geoToH3(lat, lng, this.h3Resolution);
+        const h3Index = this.$geoToH3(lat, lng, Number(this.h3Resolution));
           layer[h3Index] = (layer[h3Index] || 0) + 1;
         });
         return this.normalizeLayer(layer);
@@ -364,7 +329,7 @@ export default {
       const layer = {};
       geojson.features.forEach(feature => {
         const [lng, lat] = feature.geometry.coordinates;
-        const h3Index = this.$geoToH3(lat, lng, this.h3Resolution);
+        const h3Index = this.$geoToH3(lat, lng, Number(this.h3Resolution));
         layer[h3Index] = (layer[h3Index] || 0) + 1;
       });
       return this.normalizeLayer(layer, true);
@@ -373,7 +338,7 @@ export default {
       const layer = {};
       geojson.features.forEach(feature => {
         const [lng, lat] = feature.geometry.coordinates;
-        const stationIndex = this.$geoToH3(lat, lng, this.h3Resolution);
+        const stationIndex = this.$geoToH3(lat, lng, Number(this.h3Resolution));
         const ring = this.$kRing(stationIndex, radius);
         ring.forEach(h3Index => {
           layer[h3Index] = (layer[h3Index] || 0) + 1;
@@ -385,7 +350,7 @@ export default {
       const layer = {};
       geojson.features.forEach(feature => {
         const [lng, lat] = feature.geometry.coordinates;
-        const stationIndex = this.$geoToH3(lat, lng, this.h3Resolution);
+        const stationIndex = this.$geoToH3(lat, lng, Number(this.h3Resolution));
         // add surrounding multiple surrounding rings, with less weight in each
         const rings = this.$kRingDistances(stationIndex, radius);
         const step = 1 / (radius + 1);
@@ -409,7 +374,7 @@ export default {
         return layer;
     },
     kmToRadius(km) {
-      return Math.floor(km / this.$edgeLength(this.h3Resolution, this.$UNITS.km));
+      return Math.floor(km / this.$edgeLength(Number(this.h3Resolution), this.$UNITS.km));
     }
   }
 };
