@@ -1,0 +1,12 @@
+{
+    "agencies": [
+        {
+            "agency_key": "bart",
+            "url": "https://transitfeeds.com/p/bart/58/latest/download"
+        }
+    ],
+    "includeStops": true,
+    "outputType": "route",
+    "coordinatePrecision": 5,
+    "zipOutput": true
+}

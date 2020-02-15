@@ -1,7 +1,16 @@
 <template>
 <b-container fluid id="map-container">
   <b-row id="map-row">
-    <b-col id="sliders">
+    <b-col cols="12" md="10" id="map-col">
+      <MglMap
+        :accessToken="accessToken"
+        :mapStyle.sync="mapStyle"
+        :center="[config.lng, config.lat]"
+        :zoom="config.zoom"
+        @load="onMapLoaded">
+      </MglMap>
+    </b-col>
+    <b-col cols="12" md="2" id="sliders">
       <h3>Crime Weight: {{crimeWeight}}</h3>
       <b-form-input id="range-1" v-model="crimeWeight" type="range" min="0" max="1" step="0.01"/>
       
@@ -19,14 +28,6 @@
       
       <h3>Resolution: {{h3Resolution}}</h3>
       <b-form-input id="range-1" v-model="h3Resolution" type="range" min="6" max="10"/>
-    </b-col>
-    <b-col cols="10" id="map-col">
-      <MglMap
-        :accessToken="accessToken"
-        :mapStyle.sync="mapStyle"
-        :center="[config.lng, config.lat]"
-        @load="onMapLoaded">
-      </MglMap>
     </b-col>
   </b-row>
 </b-container>
@@ -52,7 +53,9 @@
 
 <script>
 import Mapbox from "mapbox-gl";
-import { json } from "d3-fetch";
+import { json, text } from "d3-fetch";
+import { stops } from "@/utils/gtfsToGeoJson";
+const Papa = require('papaparse');
 
 import { 
   MglMap
@@ -121,19 +124,12 @@ export default {
     async onMapLoaded(event) {
       this.map = event.map;
 
-      const asyncActions = event.component.actions;
-      
-      await asyncActions.flyTo({
-        center: [this.config.lng, this.config.lat],
-        zoom: this.config.zoom,
-        speed: 1
+      await this.seedData().then(() => {
+        this.displayData(this.map);
       });
-
-      await this.seedData();
-      this.displayData(this.map);
     },
     async displayData(map) {
-      await this.createLayers();
+      // await this.createLayers();
       
       var mapLayers = [
         {hexagons: this.schoolsLayer, weight: this.schoolWeight},
@@ -143,8 +139,6 @@ export default {
         {hexagons: this.crimeLayer, weight: -(this.crimeWeight)},
         {hexagons: this.pointsOfInterestLayer, weight: this.pointsOfInterestWeight},
       ];
-
-      console.log(mapLayers);
 
       var hexagons = this.combineLayers(mapLayers);
       this.renderHexes(map, hexagons);
@@ -160,21 +154,13 @@ export default {
         {hexagons: this.pointsOfInterestLayer, weight: this.pointsOfInterestWeight},
       ];
 
-      console.log(mapLayers);
-
       var hexagons = this.combineLayers(mapLayers);
       this.renderHexes(this.map, hexagons);
       // this.renderAreas(this.map, hexagons);
     },
-    createLayers() {
-      this.crimeLayer = this.createCrimeLayer();
-      this.schoolsLayer = this.createSchoolsLayer();
-      this.bartLayer = this.createBartLayer();
-      this.travelTimeLayer = this.createTravelTimeLayer();
-      this.pointsOfInterestLayer = this.createPointsOfInterestLayer();
-    },
     combineLayers(mapLayers) {
       const combined = {};
+      console.log(mapLayers);
       mapLayers.forEach(({hexagons, weight}) => {
         Object.keys(hexagons).forEach(hex => {
           combined[hex] = (combined[hex] || 0) + hexagons[hex] * weight;
@@ -182,17 +168,17 @@ export default {
       });
       return this.normalizeLayer(combined);  
     },
-    createCrimeLayer() {
+    createCrimeLayer(crime) {
       const layer = {};
-      this.crime90days.forEach(({lat, lng}) => {
+      crime.forEach(({lat, lng}) => {
         const h3Index = this.$geoToH3(lat, lng, Number(this.h3Resolution));
         layer[h3Index] = (layer[h3Index] || 0) + 1;
       });
       return this.normalizeLayer(layer);      
     },
-    createSchoolsLayer() {
+    createSchoolsLayer(schools) {
         const layer = {};
-        this.publicSchools.forEach(({lat, lng}) => {
+        schools.forEach(({lat, lng}) => {
           const h3Index = this.$geoToH3(lat, lng, Number(this.h3Resolution));
           // Add school hex
           layer[h3Index] = (layer[h3Index] || 0) + 1;
@@ -203,12 +189,12 @@ export default {
       });
       return this.normalizeLayer(layer);
     }, 
-    createBartLayer() {
-      return this.normalizeLayer(this.bufferPointLinear(this.bartStations, this.kmToRadius(1)));
+    createBartLayer(bartStations) {
+      return this.normalizeLayer(this.bufferPointLinear(bartStations, this.kmToRadius(1)));
     },
-    createTravelTimeLayer() {
+    createTravelTimeLayer(travelTimes) {
       const layer = {};
-      this.travelTimes.features.forEach(feature => {
+      travelTimes.features.forEach(feature => {
         const hexagons = this.$geojson2h3.featureToH3Set(feature, Number(this.h3Resolution));
         hexagons.forEach(h3Index => {
           // Lower is better, so take the inverse
@@ -217,9 +203,9 @@ export default {
       });
       return this.normalizeLayer(layer, true);
     },
-    createPointsOfInterestLayer() {
+    createPointsOfInterestLayer(pointsOfInterest) {
         const layer = {};
-        this.pointsOfInterest.filter(poi => (poi.type === 'Cafes' || poi.type === 'Places to Eat' || poi.type === 'Restaurant')).forEach(({lat, lng}) => {
+        pointsOfInterest.filter(poi => (poi.type === 'Cafes' || poi.type === 'Places to Eat' || poi.type === 'Restaurant')).forEach(({lat, lng}) => {
         const h3Index = this.$geoToH3(lat, lng, Number(this.h3Resolution));
           layer[h3Index] = (layer[h3Index] || 0) + 1;
         });
@@ -228,24 +214,47 @@ export default {
     async seedData() {
       this.crime90days = await this.seedCrimeData();
       this.publicSchools = await this.seedPublicSchoolLocations();
-      this.bartStations = await this.seedBartStations();
+      this.bartStations = await this.seedMartaStations();
       this.travelTimes = await this.seedTravelTimes();
       this.pointsOfInterest = await this.seedPointsOfInterest();
     },
-    seedTravelTimes() {
-      return json('https://gist.githubusercontent.com/nrabinowitz/d3a5ca3e3e40727595dd137b65058c76/raw/657a9f3b64fedc718c3882cd4adc645ac0b4cfc5/oakland_travel_times.json');
+    async seedTravelTimes() {
+      return json('https://gist.githubusercontent.com/nrabinowitz/d3a5ca3e3e40727595dd137b65058c76/raw/657a9f3b64fedc718c3882cd4adc645ac0b4cfc5/oakland_travel_times.json').then((travelTime) => {
+        this.createTravelTimeLayer(travelTime);
+      });
     },
-    seedBartStations() {
-      return json('https://gist.githubusercontent.com/nrabinowitz/d3a5ca3e3e40727595dd137b65058c76/raw/8f1a3e30113472404feebc288e83688a6d5cf33d/bart.json');
+    async seedMartaStations() {
+      return text('./martaStops.txt').then((text) => {
+        var martaStops =  stops(text);
+        this.createBartLayer(martaStops);
+      });
     },
-    seedCrimeData() {
-      return json('https://gist.githubusercontent.com/nrabinowitz/d3a5ca3e3e40727595dd137b65058c76/raw/f5ef0fed8972d04a27727ebb50e065265e2d853f/oakland_crime_90days.json');
+    async seedCrimeData() {
+      return Papa.parse('https://query.data.world/s/3lnfl7oqpk3fspbleodbcu4wt4hwq5', {
+        download: true,
+        header: true,
+        complete: (results) => {
+          var crimes = results.data;
+          var value = Object.keys(crimes).map(function (id) {
+                return {
+                  "lat": crimes[id].lat,
+                  "lng": crimes[id].long,
+                  "type": crimes[id].crime
+                };
+            });
+          this.createCrimeLayer(value);
+        }
+      });
     },
-    seedPublicSchoolLocations() {
-      return json('https://gist.githubusercontent.com/nrabinowitz/d3a5ca3e3e40727595dd137b65058c76/raw/babf7357f15c99a1b2a507a33d332a4a87b7df8d/public_schools.json');
+    async seedPublicSchoolLocations() {
+      return json('https://gist.githubusercontent.com/nrabinowitz/d3a5ca3e3e40727595dd137b65058c76/raw/babf7357f15c99a1b2a507a33d332a4a87b7df8d/public_schools.json').then((schools) => {
+        this.createSchoolsLayer(schools);
+      });
     },
-    seedPointsOfInterest() {
-      return json('https://gist.githubusercontent.com/nrabinowitz/d3a5ca3e3e40727595dd137b65058c76/raw/ded89c2acef426fe3ee59b05096ed1baecf02090/oakland-poi.json');
+    async seedPointsOfInterest() {
+      return json('https://gist.githubusercontent.com/nrabinowitz/d3a5ca3e3e40727595dd137b65058c76/raw/ded89c2acef426fe3ee59b05096ed1baecf02090/oakland-poi.json').then((poi) => {
+        this.createPointsOfInterestLayer(poi);
+      });
     },
     renderHexes(map, hexagons) {
       // Transform the current hexagon map into a GeoJSON object
