@@ -11,23 +11,50 @@
       </MglMap>
     </b-col>
     <b-col cols="12" md="2" id="sliders">
-      <h3>Crime Weight: {{crimeWeight}}</h3>
-      <b-form-input id="range-1" v-model="crimeWeight" type="range" min="0" max="1" step="0.01"/>
+      <p>Crime Weight: {{crimeWeight}}</p>
+      <input        
+          type="range"
+          min="0"
+          max="1"
+          step="0.01"
+          v-bind:value="crimeWeight"
+          v-on:input="onSliderChange($event, 'crime')"/>
       
-      <h3>School Weight: {{schoolWeight}}</h3>
-      <b-form-input id="range-1" v-model="schoolWeight" type="range" min="0" max="1" step="0.01"/>
+      <p>Dog Park Weight: {{dogParkWeight}}</p>
+      <input        
+          type="range"
+          min="0"
+          max="1"
+          step="0.01"
+          v-bind:value="dogParkWeight"
+          v-on:input="onSliderChange($event, 'dogParks')"/>
+
+      <p>Marta Weight: {{martaWeight}}</p>
+      <input        
+          type="range"
+          min="0"
+          max="1"
+          step="0.01"
+          v-bind:value="martaWeight"
+          v-on:input="onSliderChange($event, 'marta')"/>
+
+      <p>Travel Time Weight: {{travelWeight}}</p>
+      <input        
+          type="range"
+          min="0"
+          max="1"
+          step="0.01"
+          v-bind:value="travelWeight"
+          v-on:input="onSliderChange($event, 'travelTime')"/>
       
-      <h3>Bart Weight: {{bartWeight}}</h3>
-      <b-form-input id="range-1" v-model="bartWeight" type="range" min="0" max="1" step="0.01"/>
-      
-      <h3>Travel Time Weight: {{travelWeight}}</h3>
-      <b-form-input id="range-1" v-model="travelWeight" type="range" min="0" max="1" step="0.01"/>
-      
-      <h3>Points of Interest Weight: {{pointsOfInterestWeight}}</h3>
-      <b-form-input id="range-1" v-model="pointsOfInterestWeight" type="range" min="0" max="1" step="0.01"/>
-      
-      <h3>Resolution: {{h3Resolution}}</h3>
-      <b-form-input id="range-1" v-model="h3Resolution" type="range" min="6" max="10"/>
+      <!-- <p>Points of Interest Weight: {{pointsOfInterestWeight}}</p>
+      <input        
+          type="range"
+          min="0"
+          max="1"
+          step="0.01"
+          v-bind:value="pointsOfInterestWeight"
+          v-on:input="onSliderChange($event, 'poi')"/> -->
     </b-col>
   </b-row>
 </b-container>
@@ -55,6 +82,7 @@
 import Mapbox from "mapbox-gl";
 import { json, text } from "d3-fetch";
 import { stops } from "@/utils/gtfsToGeoJson";
+// import { createTravelTimeData } from "@/utils/createTravelTimesData";
 const Papa = require('papaparse');
 
 import { 
@@ -65,54 +93,34 @@ export default {
   components: {
     MglMap
   },
-  watch: {
-    crimeWeight: function() {
-      this.redistributeWeights();
-    },
-    schoolWeight: function() {
-      this.redistributeWeights();
-    },
-    bartWeight: function() {
-      this.redistributeWeights();
-    },
-    travelWeight: function() {
-      this.redistributeWeights();
-    },
-    pointsOfInterestWeight: function() {
-      this.redistributeWeights();
-    },
-    h3Resolution: function() {
-      this.displayData(this.map);
-    }
-  },
   data() {
     return {
       accessToken: 'pk.eyJ1IjoiY2xqMDAyMCIsImEiOiJjam80b2Y4cmEwMWFrM3ZwNW9wbzZvNjF0In0.tGdbiR2A0B9bbHXo_Hg93w', // your access token. Needed if you using Mapbox maps
       mapStyle: 'mapbox://styles/mapbox/streets-v11', // your map style
       config: {
-        lng: -122.2,
-        lat: 37.7923539,
+        lng: -84.387595,
+        lat: 33.746605,
         zoom: 11,
         fillOpacity: 0.9,
         colorScale: ['#ffffD9', '#50BAC3', '#1A468A'],
         areaThreshold: 0.75
       },
-      h3Resolution: 7,
+      h3Resolution: 8,
       crimeLayer: null,
       crime90days: null,
       crimeWeight: 1,
-      schoolsLayer: null,
-      publicSchools: null,
-      schoolWeight: 1,
-      pointsOfInterestLayer: null,
-      pointsOfInterest: null,
-      pointsOfInterestWeight: 1,
+      dogParksLayer: null,
+      dogParks: null,
+      dogParkWeight: 1,
+      // pointsOfInterestLayer: null,
+      // pointsOfInterest: null,
+      // pointsOfInterestWeight: 1,
       travelTimeLayer: null,
       travelTimes: null,
       travelWeight: 1,
-      bartLayer: null,
-      bartStations: null,
-      bartWeight: 1
+      martaLayer: null,
+      martaStations: null,
+      martaWeight: 1
     };
   },
   created() {
@@ -129,32 +137,51 @@ export default {
       this.displayData(this.map);
     },
     displayData(map) {
-      console.log("Displaying data.");
+      console.log("Displaying data.");      
+      this.createLayers();
+
       var mapLayers = [
-        {name: "schools", hexagons: this.schoolsLayer, weight: this.schoolWeight},
-        {name: "bart", hexagons: this.bartLayer, weight: this.bartWeight},
-        {name: "traveltime", hexagons: this.travelTimeLayer, weight: this.travelWeight},
         // Crime is bad, so we'll subtract it instead of adding
         {name: "crime", hexagons: this.crimeLayer, weight: -(this.crimeWeight)},
-        {name: "poi", hexagons: this.pointsOfInterestLayer, weight: this.pointsOfInterestWeight},
+        {name: "dogParks", hexagons: this.dogParksLayer, weight: this.dogParkWeight},
+        {name: "marta", hexagons: this.martaLayer, weight: this.martaWeight},
+        {name: "traveltime", hexagons: this.travelTimeLayer, weight: this.travelWeight},
+        // {name: "poi", hexagons: this.pointsOfInterestLayer, weight: this.pointsOfInterestWeight}
       ];
-
-      console.log(mapLayers);
-
+      
       var hexagons = this.combineLayers(mapLayers);
       this.renderHexes(map, hexagons);
+    },
+    onSliderChange(event, type) {
+      if (type == 'crime') {
+        this.crimeWeight = Number(event.target.value);
+      } else if (type == 'dogParks') {
+        this.dogParkWeight = Number(event.target.value);
+      } else if (type == 'marta') {
+        this.martaWeight = Number(event.target.value);
+      } else if (type == 'travelTime') {
+        this.travelWeight = Number(event.target.value);
+      } 
+      // else if (type == 'poi') {
+      //   this.pointsOfInterestWeight = Number(event.target.value);  
+      // }      
+      console.log("Slider change", type);
+
+      this.redistributeWeights();
     },
     redistributeWeights() {
       console.log("Redistributing weights");
 
       var mapLayers = [
-        {hexagons: this.schoolsLayer, weight: this.schoolWeight},
-        {hexagons: this.bartLayer, weight: this.bartWeight},
-        {hexagons: this.travelTimeLayer, weight: this.travelWeight},
         // Crime is bad, so we'll subtract it instead of adding
-        {hexagons: this.crimeLayer, weight: -(this.crimeWeight)},
-        {hexagons: this.pointsOfInterestLayer, weight: this.pointsOfInterestWeight},
+        {name: "crime", hexagons: this.crimeLayer, weight: -(this.crimeWeight)},
+        {name: "dogParks", hexagons: this.dogParksLayer, weight: this.dogParkWeight},
+        {name: "marta", hexagons: this.martaLayer, weight: this.martaWeight},
+        {name: "traveltime", hexagons: this.travelTimeLayer, weight: this.travelWeight},
+        // {name: "poi", hexagons: this.pointsOfInterestLayer, weight: this.pointsOfInterestWeight}
       ];
+
+      console.log("Map layers", mapLayers);
 
       var hexagons = this.combineLayers(mapLayers);
       this.renderHexes(this.map, hexagons);
@@ -168,37 +195,46 @@ export default {
       });
       return this.normalizeLayer(combined);  
     },
-    createCrimeLayer(crime) {
-      console.log("Creating crime layer", crime);
+    createLayers() {
+      console.log("Creating layers");
+      this.crimeLayer = this.createCrimeLayer();
+      this.dogParksLayer = this.createDogParksLayer();
+      this.martaLayer = this.createMartaLayer();
+      this.travelTimeLayer = this.createTravelTimeLayer();
+      // this.pointsOfInterestLayer = this.createPointsOfInterestLayer();
+    },
+    createCrimeLayer() {
+      console.log("Creating crime layer", this.crime90days);
       const layer = {};
-      crime.forEach(({lat, lng}) => {
+      this.crime90days.forEach(({lat, lng}) => {
         const h3Index = this.$geoToH3(lat, lng, Number(this.h3Resolution));
         layer[h3Index] = (layer[h3Index] || 0) + 1;
       });
       return this.normalizeLayer(layer);      
     },
-    createSchoolsLayer(schools) {
-        console.log("Creating schools layer", schools);
-        const layer = {};
-        schools.forEach(({lat, lng}) => {
-          const h3Index = this.$geoToH3(lat, lng, Number(this.h3Resolution));
-          // Add school hex
-          layer[h3Index] = (layer[h3Index] || 0) + 1;
-          // add surrounding kRing, with less weight
-          this.$hexRing(h3Index, 1).forEach(neighbor => {
-            layer[neighbor] = (layer[neighbor] || 0) + 0.5;
-          });
-      });
-      return this.normalizeLayer(layer);
+    createDogParksLayer() {
+        console.log("Creating dog parks layer", this.dogParks);
+        // const layer = {};
+        // this.dogParks.forEach(({lat, lng}) => {
+        //   const h3Index = this.$geoToH3(lat, lng, Number(this.h3Resolution));
+        //   // Add school hex
+        //   layer[h3Index] = (layer[h3Index] || 0) + 1;
+        //   // add surrounding kRing, with less weight
+        //   this.$hexRing(h3Index, 1).forEach(neighbor => {
+        //     layer[neighbor] = (layer[neighbor] || 0) + 0.5;
+        //   });
+        // });
+        // return this.normalizeLayer(layer);
+        return this.normalizeLayer(this.bufferPointLinear(this.martaStations, this.kmToRadius(1)));
     }, 
-    createBartLayer(bartStations) {
-      console.log("Creating bart layer", bartStations);
-      return this.normalizeLayer(this.bufferPointLinear(bartStations, this.kmToRadius(1)));
+    createMartaLayer() {
+      console.log("Creating marta layer", this.martaStations);
+      return this.normalizeLayer(this.bufferPointLinear(this.martaStations, this.kmToRadius(1)));
     },
-    createTravelTimeLayer(travelTimes) {
-      console.log("Creating travel time layer", travelTimes);
+    createTravelTimeLayer() {
+      console.log("Creating travel time layer", this.travelTimes);
       const layer = {};
-      travelTimes.features.forEach(feature => {
+      this.travelTimes.features.forEach(feature => {
         const hexagons = this.$geojson2h3.featureToH3Set(feature, Number(this.h3Resolution));
         hexagons.forEach(h3Index => {
           // Lower is better, so take the inverse
@@ -207,10 +243,10 @@ export default {
       });
       return this.normalizeLayer(layer, true);
     },
-    createPointsOfInterestLayer(pointsOfInterest) {
-        console.log("Creating poi layer", pointsOfInterest);
+    createPointsOfInterestLayer() {
+        console.log("Creating poi layer", this.pointsOfInterest);
         const layer = {};
-        pointsOfInterest.filter(poi => (poi.type === 'Cafes' || poi.type === 'Places to Eat' || poi.type === 'Restaurant')).forEach(({lat, lng}) => {
+        this.pointsOfInterest.filter(poi => (poi.type === 'Cafes' || poi.type === 'Places to Eat' || poi.type === 'Restaurant')).forEach(({lat, lng}) => {
         const h3Index = this.$geoToH3(lat, lng, Number(this.h3Resolution));
           layer[h3Index] = (layer[h3Index] || 0) + 1;
         });
@@ -218,27 +254,24 @@ export default {
     },
     async seedData() {
       console.log("Seeding data");
-      this.crimeLayer = await this.seedCrimeData();
-      console.log("Crime layer", this.crimeLayer);
-      this.schoolsLayer = await this.seedPublicSchoolLocations();
-      console.log("Schools layer", this.schoolsLayer);
-      this.bartLayer = await this.seedMartaStations();
-      console.log("Bart layer", this.bartLayer);
-      this.travelTimeLayer = await this.seedTravelTimes();
-      console.log("Travel Time layer", this.travelTimeLayer);
-      this.pointsOfInterestLayer = await this.seedPointsOfInterest();
-      console.log("POI layer", this.pointsOfInterestLayer);
+      this.crime90days = await this.seedCrimeData();
+      console.log("Crimes", this.crime90days);
+      this.dogParks = await this.seedDogParkLocations();
+      console.log("Dog Parks", this.dogParks);
+      this.martaStations = await this.seedMartaStations();
+      console.log("Marta stations", this.martaStations);
+      this.travelTimes = await this.seedTravelTimes();
+      console.log("Travel Times", this.travelTimes);
+      // this.pointsOfInterest = await this.seedPointsOfInterest();
+      // console.log("POI", this.pointsOfInterest);
       return "Seeded";
     },
     seedTravelTimes() {
-      return json('https://gist.githubusercontent.com/nrabinowitz/d3a5ca3e3e40727595dd137b65058c76/raw/657a9f3b64fedc718c3882cd4adc645ac0b4cfc5/oakland_travel_times.json').then((travelTime) => {
-        return this.createTravelTimeLayer(travelTime);
-      });
+      return json('./travelTimes.json');
     },
     seedMartaStations() {
       return text('./martaStops.txt').then((text) => {
-        var martaStops =  stops(text);
-        return this.createBartLayer(martaStops);
+        return stops(text);
       });
     },
     seedCrimeData() {
@@ -256,20 +289,16 @@ export default {
                       "type": crimes[id].crime
                     };
                 });
-              resolve(this.createCrimeLayer(value));
+              resolve(value);
             }
           });
       });
     },
-    seedPublicSchoolLocations() {
-      return json('https://gist.githubusercontent.com/nrabinowitz/d3a5ca3e3e40727595dd137b65058c76/raw/babf7357f15c99a1b2a507a33d332a4a87b7df8d/public_schools.json').then((schools) => {
-        return this.createSchoolsLayer(schools);
-      });
+    seedDogParkLocations() {
+      return json('./dogParks.json');
     },
     seedPointsOfInterest() {
-      return json('https://gist.githubusercontent.com/nrabinowitz/d3a5ca3e3e40727595dd137b65058c76/raw/ded89c2acef426fe3ee59b05096ed1baecf02090/oakland-poi.json').then((poi) => {
-        return this.createPointsOfInterestLayer(poi);
-      });
+      return json('https://gist.githubusercontent.com/nrabinowitz/d3a5ca3e3e40727595dd137b65058c76/raw/ded89c2acef426fe3ee59b05096ed1baecf02090/oakland-poi.json');
     },
     renderHexes(map, hexagons) {
       // Transform the current hexagon map into a GeoJSON object
