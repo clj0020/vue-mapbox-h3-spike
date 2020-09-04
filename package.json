@@ -16,7 +16,7 @@
     "geojson2h3": "^1.0.1",
     "h3-js": "^3.6.3",
     "mapbox-gl": "^1.7.0",
-    "papaparse": "^5.1.1",
+    "papaparse": "^5.2.0",
     "vue": "^2.6.11",
     "vue-mapbox": "^0.4.1"
   },
